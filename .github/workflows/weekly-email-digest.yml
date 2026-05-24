@@ -1,0 +1,49 @@
+name: Weekly Email Digest
+
+on:
+  schedule:
+    # 08:00 every Monday in Asia/Shanghai.
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  send-weekly-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: cd scripts && npm install
+
+      - name: Configure delivery
+        run: |
+          mkdir -p "$HOME/.follow-builders"
+          cat > "$HOME/.follow-builders/config.json" <<'JSON'
+          {
+            "frequency": "weekly",
+            "time": "08:00",
+            "weeklyDay": "monday",
+            "timezone": "Asia/Shanghai",
+            "language": "zh",
+            "delivery": {
+              "method": "email",
+              "email": "patrick0406@163.com"
+            }
+          }
+          JSON
+
+      - name: Build weekly digest
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
+        run: cd scripts && node build-weekly-digest.js > /tmp/follow-builders-weekly-digest.txt
+
+      - name: Send email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: cd scripts && node deliver.js --file /tmp/follow-builders-weekly-digest.txt
